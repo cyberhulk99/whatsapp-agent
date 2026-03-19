@@ -1,6 +1,8 @@
 # 🤖 WhatsApp AI Agent
 
-> An AI-powered WhatsApp agent for busy engineering team leads — get instant message summaries, mention alerts, and natural language search across all your group chats.
+> Stop reading every message. Just ask what matters.
+
+An AI-powered WhatsApp agent that summarizes your chats, alerts you when someone mentions you, and lets you search messages in plain English — all from your terminal.
 
 ![Node.js](https://img.shields.io/badge/node-%3E%3D16-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
@@ -9,11 +11,23 @@
 
 ## ✨ Features
 
-- **📋 Smart Summaries** — Summarize any chat in seconds using Claude or GPT-4o-mini
-- **🔔 Instant Mention Alerts** — Get notified the moment someone tags you
-- **🔍 Natural Language Search** — Ask anything: *"what did Rahul say about the deployment?"*
-- **📅 Historical Load** — Loads the last 8 hours of messages on startup
-- **🔀 AI Provider Choice** — Switch between Claude (Anthropic) and GPT-4o-mini (OpenAI)
+- **📋 Smart Summaries** — Get bullet-point summaries of any chat on demand
+- **🔔 Instant Mention Alerts** — Know the moment someone tags you, in any group
+- **🔍 Natural Language Search** — Ask anything in plain English
+- **📅 Loads History on Startup** — Query past messages the moment it connects
+- **🔀 Your Choice of AI** — Claude (Anthropic) or GPT-4o-mini (OpenAI)
+
+---
+
+## 💡 Who Is This For?
+
+Anyone who deals with too many WhatsApp groups:
+
+- Professionals juggling multiple team or client groups
+- Students in dozens of college and project groups
+- Community admins managing large groups
+- Freelancers tracking client conversations
+- Anyone tired of scrolling through hundreds of messages
 
 ---
 
@@ -29,41 +43,45 @@ npm install
 
 # 3. Set up environment
 cp .env.example .env
-# → Edit .env with your API key and WhatsApp name
+# → Open .env and fill in your details (see Configuration below)
 
 # 4. Run
 npm run dev
 ```
 
-Scan the QR code that appears → WhatsApp → Linked Devices → Link a Device.
+A QR code will appear — scan it with WhatsApp → **Linked Devices → Link a Device**.
 
 ---
 
 ## ⚙️ Configuration
 
-Edit `.env`:
+Open `.env` and fill in:
 
 ```env
+# ── AI Provider ──────────────────────────────────────────────────
 # Choose: "claude" or "openai"
 AI_PROVIDER=openai
 
-# OpenAI key  →  https://platform.openai.com/api-keys
+# OpenAI key → https://platform.openai.com/api-keys
 OPENAI_API_KEY=sk-proj-...
 
-# Anthropic key  →  https://console.anthropic.com  (if using claude)
+# Anthropic key → https://console.anthropic.com (only if AI_PROVIDER=claude)
 ANTHROPIC_API_KEY=sk-ant-...
 
-# Your WhatsApp display name (for mention detection)
-MY_NAME=Suman
+# ── WhatsApp ──────────────────────────────────────────────────────
+# Your WhatsApp display name — used to detect when someone mentions you
+MY_NAME=YourName
 
-# Your phone number with country code
+# Your phone number with country code (no + or spaces)
+# Example: 919876543210 for India, 14155550123 for US
 MY_PHONE=919876543210
 
-# Hours of history to load on startup (default: 8)
+# How many hours of history to load on startup (default: 8)
 SUMMARY_HOURS=8
 
-# Specific chats to monitor — leave empty to watch ALL
-WATCH_CHATS=Team Alpha,DevOps,Backend
+# Chats to monitor — comma separated. Leave empty to watch ALL chats.
+# Example: "Friends,Work Team,Project Alpha"
+WATCH_CHATS=
 ```
 
 ---
@@ -79,28 +97,31 @@ Once running, type in the terminal:
 | `m` | Show only your mentions |
 | `h` | Help |
 | `q` | Quit |
-| *anything else* | Ask in natural language |
+| *anything else* | Ask in plain English |
 
-### Natural Language Examples
+### Ask Anything
 
 ```
-what did Rahul say today?
-any messages about the server issue?
-show messages from the DevOps group
-did anyone talk about the release?
-check last message from Ayushi
+what did John say today?
+any important messages in the last 2 hours?
+show messages from the Project Alpha group
+did anyone mention the deadline?
+what's happening in the family group?
+any unread messages about payment?
 ```
 
 ---
 
 ## 🧠 AI Providers
 
-| Provider | Model | Cost |
-|----------|-------|------|
-| OpenAI | gpt-4o-mini | ~$0.15/1M tokens (very cheap) |
-| Anthropic | claude-opus-4-6 | $5/1M tokens (more powerful) |
+| Provider | Model | Cost estimate |
+|----------|-------|--------------|
+| OpenAI | gpt-4o-mini | ~$0.15 per 1M tokens — very cheap |
+| Anthropic | claude-opus-4-6 | $5 per 1M tokens — more powerful |
 
 Switch anytime by changing `AI_PROVIDER` in `.env` and restarting.
+
+> **Tip:** Start with OpenAI — it handles summarization very well at almost zero cost.
 
 ---
 
@@ -116,12 +137,28 @@ Switch anytime by changing `AI_PROVIDER` in `.env` and restarting.
 ## ⚠️ Requirements
 
 - Node.js ≥ 16 (18+ recommended)
-- Google Chrome installed
+- Google Chrome installed on your machine
 - An active WhatsApp account
-- OpenAI or Anthropic API key
+- An OpenAI or Anthropic API key
+
+---
+
+## ❓ FAQ
+
+**Does this work with WhatsApp Business?**
+Yes, it works with both regular and Business accounts.
+
+**Is my data sent anywhere?**
+Messages are sent to the AI provider (OpenAI or Anthropic) only when you request a summary or ask a question. Nothing is stored outside your machine.
+
+**Will WhatsApp ban my account?**
+This uses WhatsApp Web — the same connection your browser uses. Risk is low but use responsibly.
+
+**Does it work on Windows/Mac?**
+Yes, as long as Node.js and Chrome are installed.
 
 ---
 
 ## 📄 License
 
-MIT
+MIT — free to use, modify, and share.
