@@ -2,7 +2,11 @@ node_modules/
 dist/
 .env
 .wa-session/
+.wwebjs_cache/
 *.log
 .DS_Store
 .claude/
 .cursor/
+*.docx
+*.pdf
+*.xlsx

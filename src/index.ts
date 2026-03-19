@@ -1,13 +1,15 @@
 import "dotenv/config";
+import fs from "fs";
+import path from "path";
 // Polyfill all missing Web API globals for Node 16 in one shot
 import { fetch, Headers, Request, Response, FormData } from "undici";
 Object.assign(globalThis, { fetch, Headers, Request, Response, FormData });
 import pkg from "whatsapp-web.js";
-const { Client, LocalAuth } = pkg as any;
+const { Client, LocalAuth, MessageMedia } = pkg as any;
 import qrcode from "qrcode-terminal";
 import chalk from "chalk";
 import { addMessage } from "./store.js";
-import { generateReport, queryMessages } from "./summarizer.js";
+import { generateReport, queryMessages, detectSendIntent } from "./summarizer.js";
 import { printReport } from "./reporter.js";
 import type { StoredMessage } from "./types.js";
 
@@ -121,11 +123,25 @@ wa.on("message", async (msg: any) => {
   }
 });
 
+// ── Pending send confirmation state ──────────────────────────────
+let pendingSend: { to: string; message: string } | null = null;
+
 // ── CLI commands ─────────────────────────────────────────────────
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", async (raw) => {
   const input = String(raw).trim();
   const lower = input.toLowerCase();
+
+  // ── Confirmation step for pending send ─────────────────────────
+  if (pendingSend) {
+    if (lower === "y" || lower === "yes") {
+      await executeSend(pendingSend.to, pendingSend.message);
+    } else {
+      console.log(chalk.gray("  Cancelled.\n"));
+    }
+    pendingSend = null;
+    return;
+  }
 
   if (lower === "s" || lower === "summary") {
     await runSummary(SUMMARY_HOURS);
@@ -138,6 +154,17 @@ process.stdin.on("data", async (raw) => {
     }
   } else if (lower === "m" || lower === "mentions") {
     await runMentionsOnly(SUMMARY_HOURS);
+  } else if (lower.startsWith("send ") && lower.includes("|")) {
+    // Explicit: send <name> | <message or filepath> | <optional caption>
+    const parts = input.slice(5).split("|");
+    const to = parts[0].trim();
+    const second = parts[1]?.trim() ?? "";
+    const caption = parts[2]?.trim() ?? "";
+    if (!to || !second) {
+      console.log(chalk.red("Usage: send <name> | <message>  or  send <name> | /path/to/file | caption"));
+    } else {
+      await confirmSend(to, second, caption || undefined);
+    }
   } else if (lower === "h" || lower === "help") {
     printHelp();
   } else if (lower === "q" || lower === "quit") {
@@ -145,8 +172,13 @@ process.stdin.on("data", async (raw) => {
     await wa.destroy();
     process.exit(0);
   } else if (input.length > 0) {
-    // ── Natural language query ──────────────────────────────────
-    await runQuery(input);
+    // ── Natural language — check for send intent first ──────────
+    const intent = await detectSendIntent(input);
+    if (intent.isSend) {
+      await confirmSend(intent.to, intent.message, (intent as any).caption);
+    } else {
+      await runQuery(input);
+    }
   }
 });
 
@@ -248,6 +280,77 @@ async function loadHistory(): Promise<void> {
   }
 }
 
+function isFilePath(str: string): boolean {
+  // Treat as file if it starts with / ~ . or contains a file extension
+  return (
+    str.startsWith("/") ||
+    str.startsWith("~/") ||
+    str.startsWith("./") ||
+    /\.[a-zA-Z0-9]{2,5}$/.test(str)
+  );
+}
+
+async function confirmSend(to: string, content: string, caption?: string): Promise<void> {
+  pendingSend = { to, message: content + (caption ? `|||${caption}` : "") };
+  const isFile = isFilePath(content);
+  const label = isFile ? "File:    " : "Message: ";
+  let preview = isFile ? chalk.cyan(path.basename(content)) : chalk.white(content);
+  if (isFile && caption) preview += chalk.gray(`  (caption: ${caption})`);
+
+  console.log(
+    chalk.bold.yellow(`\n📤 Send ${isFile ? "file" : "message"}?`) +
+    "\n  To:      " + chalk.cyan(to) +
+    `\n  ${label}` + preview +
+    "\n\n  " + chalk.bold("y") + " to confirm, anything else to cancel\n"
+  );
+}
+
+async function executeSend(to: string, rawContent: string): Promise<void> {
+  // Split caption back out if present
+  const [content, caption] = rawContent.split("|||");
+
+  try {
+    // Find the chat
+    const chats = await wa.getChats();
+    let chat = chats.find((c: any) =>
+      (c.name ?? "").toLowerCase().includes(to.toLowerCase())
+    );
+
+    if (!chat) {
+      const contacts = await wa.getContacts();
+      const contact = contacts.find((c: any) =>
+        (c.pushname ?? c.name ?? "").toLowerCase().includes(to.toLowerCase())
+      );
+      if (!contact) {
+        console.log(chalk.red(`\n  ✗ Could not find "${to}" in your chats or contacts.\n`));
+        return;
+      }
+      chat = await contact.getChat();
+    }
+
+    // Send file or text
+    if (isFilePath(content)) {
+      const resolved = content.startsWith("~/")
+        ? path.join(process.env.HOME ?? "", content.slice(2))
+        : path.resolve(content);
+
+      if (!fs.existsSync(resolved)) {
+        console.log(chalk.red(`\n  ✗ File not found: ${resolved}\n`));
+        return;
+      }
+
+      const media = MessageMedia.fromFilePath(resolved);
+      await chat.sendMessage(media, caption ? { caption } : {});
+      console.log(chalk.green(`\n  ✓ File "${path.basename(resolved)}" sent to ${to}\n`));
+    } else {
+      await chat.sendMessage(content);
+      console.log(chalk.green(`\n  ✓ Message sent to ${to}\n`));
+    }
+  } catch (err) {
+    console.error(chalk.red("  ✗ Failed to send:"), err);
+  }
+}
+
 async function runQuery(question: string): Promise<void> {
   console.log(chalk.gray("\nThinking…"));
   try {
@@ -260,16 +363,20 @@ async function runQuery(question: string): Promise<void> {
 
 function printHelp(): void {
   console.log(chalk.bold("\nCommands:"));
-  console.log("  " + chalk.cyan("s") + "                      Generate summary (last " + SUMMARY_HOURS + "h)");
-  console.log("  " + chalk.cyan("summary <hours>") + "       Generate summary for custom window");
-  console.log("  " + chalk.cyan("m") + "                      Show only your mentions");
-  console.log("  " + chalk.cyan("h") + "                      Show this help");
-  console.log("  " + chalk.cyan("q") + "                      Quit");
-  console.log("\n  " + chalk.bold("Or just ask anything:"));
+  console.log("  " + chalk.cyan("s") + "                           Generate summary (last " + SUMMARY_HOURS + "h)");
+  console.log("  " + chalk.cyan("summary <hours>") + "            Generate summary for custom window");
+  console.log("  " + chalk.cyan("m") + "                           Show only your mentions");
+  console.log("  " + chalk.cyan("send <name> | <message>") + "           Send a text message");
+  console.log("  " + chalk.cyan("send <name> | /path/file.jpg") + "      Send an image or file");
+  console.log("  " + chalk.cyan("send <name> | /path/file.pdf | caption") + "  File with caption");
+  console.log("  " + chalk.cyan("h") + "                           Show this help");
+  console.log("  " + chalk.cyan("q") + "                           Quit");
+  console.log("\n  " + chalk.bold("Or just type naturally:"));
   console.log("  " + chalk.yellow("what did Rahul say today?"));
-  console.log("  " + chalk.yellow("any messages about the deployment?"));
-  console.log("  " + chalk.yellow("show messages from the DevOps group"));
-  console.log("  " + chalk.yellow("did anyone mention the server issue?\n"));
+  console.log("  " + chalk.yellow("send Chandreyee Ki korchis?"));
+  console.log("  " + chalk.yellow("send /home/user/photo.jpg to John with caption check this"));
+  console.log("  " + chalk.yellow("tell John the meeting is at 3pm"));
+  console.log("  " + chalk.yellow("any messages about the deployment?\n"));
   console.log(chalk.gray("Messages are collected automatically. Mentions notify instantly.\n"));
 }
 

@@ -82,6 +82,40 @@ async function summarizeChat(chatName: string, msgs: StoredMessage[]): Promise<s
   return callAI(`Summarize the following WhatsApp conversation from "${chatName}":\n\n${formatted}`);
 }
 
+export interface SendIntent {
+  isSend: true;
+  to: string;
+  message: string;
+}
+export interface QueryIntent {
+  isSend: false;
+}
+
+/**
+ * Detect if the user's input is a send-message request.
+ * Returns the recipient and message body if so.
+ */
+export async function detectSendIntent(input: string): Promise<SendIntent | QueryIntent> {
+  const prompt =
+    `The user typed: "${input}"\n\n` +
+    `Is this a request to SEND a WhatsApp message or file to someone?\n` +
+    `If YES, reply with ONLY valid JSON:\n` +
+    `  Text: {"isSend": true, "to": "<name>", "message": "<text>"}\n` +
+    `  File: {"isSend": true, "to": "<name>", "message": "<filepath>", "caption": "<optional caption>"}\n` +
+    `If NO, reply with ONLY: {"isSend": false}\n` +
+    `No explanation. JSON only.`;
+
+  const system = "You extract send-message intent from user input. Reply only with JSON.";
+  const raw = await callAI(prompt, system);
+
+  try {
+    const parsed = JSON.parse(raw.trim());
+    return parsed as SendIntent | QueryIntent;
+  } catch {
+    return { isSend: false };
+  }
+}
+
 /**
  * Answer a free-form question about stored messages (last 24h).
  */
