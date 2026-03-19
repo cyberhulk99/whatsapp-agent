@@ -21,7 +21,7 @@
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/YOUR_USERNAME/whatsapp-agent.git
+git clone https://github.com/cyberhulk99/whatsapp-agent.git
 cd whatsapp-agent
 
 # 2. Install dependencies
