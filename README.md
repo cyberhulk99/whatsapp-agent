@@ -159,6 +159,18 @@ Yes, as long as Node.js and Chrome are installed.
 
 ---
 
+## ⚠️ Disclaimer
+
+This project is built for **personal productivity use only**.
+
+- This tool uses an unofficial WhatsApp Web client and is **not affiliated with, endorsed, or authorized by WhatsApp or Meta** in any way.
+- Use this tool **only on your own WhatsApp account**. Do not use it to monitor, scrape, or send messages on behalf of others without their consent.
+- The author is **not responsible for any misuse**, account bans, data breaches, privacy violations, or any other consequences arising from the use of this software.
+- By using this project, you agree to comply with [WhatsApp's Terms of Service](https://www.whatsapp.com/legal/terms-of-service) and all applicable laws in your region.
+- **Use responsibly. Use ethically.**
+
+---
+
 ## 📄 License
 
 MIT — free to use, modify, and share.
