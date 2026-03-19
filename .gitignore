@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.wa-session/
+*.log
+.DS_Store
+.claude/
+.cursor/
